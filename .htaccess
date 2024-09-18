@@ -1,0 +1,29 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews
+    </IfModule>
+
+    # Chuyển hướng HTTP sang HTTPS
+    RewriteCond %{HTTPS} off
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    RewriteEngine On
+
+    # Xử lý Authorization header
+    RewriteCond %{HTTP:Authorization} .+
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Xử lý các yêu cầu đến tệp hoặc thư mục hiện có
+    RewriteCond %{REQUEST_FILENAME} -d [OR]
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ ^$1 [N]
+
+    # Chuyển hướng yêu cầu đến thư mục public
+    RewriteCond %{REQUEST_URI} (.\w+$) [NC]
+    RewriteRule ^(.*)$ public/$1
+
+    # Chuyển hướng tất cả các yêu cầu khác đến server.php
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ server.php
+</IfModule>
