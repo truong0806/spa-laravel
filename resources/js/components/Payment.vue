@@ -113,6 +113,7 @@ const formSubmit = handleSubmit(async (values) => {
   values.discount = props.discount;
   values.payment_type = values.payment_method;
   values.wallet_amount = props.wallet_amount;
+  console.log("props.is_pay_now",props.is_pay_now);
   if (props.advance_payment_amount != null) {
     if(props.is_pay_now === 3){     
       values.total_amount = props.total_amount - props.advance_paid_amount;

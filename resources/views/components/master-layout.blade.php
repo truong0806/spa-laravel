@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="baseUrl" content="{{env('APP_URL')}}" />
 
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
     <title>{{ config('app.name', 'Laravel') }}</title>
 
     @include('partials._head')

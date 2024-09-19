@@ -746,14 +746,14 @@ class BookingController extends Controller
 
         $payment_data = Payment::where('booking_id', $data['booking_id'])->first();
         $data['total_amount'] = $data['total_amount'];
-        if (!empty($payment_data)) {
+        if (!empty($payment_data) && $data['type'] != 'full_payment') {
             $payment_data->update($data);
         } else {
             $payment_data = Payment::create($data);
         }
         $sitesetup = Setting::where('type', 'site-setup')->where('key', 'site-setup')->first();
         $sitesetupdata = $sitesetup ? json_decode($sitesetup->value, true) : null;
-
+       
         $country_id = $sitesetupdata['default_currency'] ?? null;
         $country = Country::find($country_id);
 
@@ -776,7 +776,6 @@ class BookingController extends Controller
 
                 break;
         }
-
         return comman_custom_response($data);
     }
 
@@ -817,14 +816,16 @@ class BookingController extends Controller
     {
 
         $data = $request->all();
-        
         $checkout_session = getmomopayments($data);
         if (isset($checkout_session['message'])) {
 
             return comman_custom_response($checkout_session);
         } else {
-            Payment::where('booking_id', $data['booking_id'])->update(['txn_id' => $checkout_session['id'], 'payment_status' => 'pending']);
 
+            payment::where('booking_id', $data['booking_id'])    
+                ->latest() 
+                ->first() 
+                ->update(['txn_id' => $checkout_session['id'],'payment_status' => 'pending']); 
             return comman_custom_response($checkout_session);
         }
     }

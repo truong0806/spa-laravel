@@ -2259,7 +2259,7 @@ function getmomopayments($data)
     // $amount = $data['booking_id'];
     $extraData = '';
 
-    $orderInfo = 'Thanh_toan_don_hang_' . $data['booking_id'] . '_' . $data['customer_id'] . '_' . $data['total_amount'] . '_' . $data['discount'] . '_' . $data['type'] . '_momo';
+    $orderInfo = 'Thanh_toan_don_hang_' . $data['booking_id'] . '_' . $data['customer_id'] . '_' . $data['total_amount'] . '_' . $data['discount'] . '_' . $data['type'];
     $rawSignature = "accessKey=" . $accessKey . "&amount=" . $amount . "&extraData=" . $extraData . "&ipnUrl=" . $ipnUrl . "&orderId=" . $orderId . "&orderInfo=" . $orderInfo . "&partnerCode=" . $partnerCode . "&redirectUrl=" . $redirectUrl . "&requestId=" . $requestId . "&requestType=" . $requestType;
 
     $signature = hash_hmac('sha256', $rawSignature, $secretKey);

@@ -3,6 +3,7 @@
          $headerSection = App\Models\FrontendSetting::where('key', 'heder-menu-setting')->first();
          $sectionData = $headerSection ? json_decode($headerSection->value, true) : null;
       @endphp
+      
     <div class="top-header bg-primary d-md-block d-none">
        <div class="container-fluid">
           <div class="row align-items-center">

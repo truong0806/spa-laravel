@@ -129,8 +129,10 @@ class PaymentController extends Controller
 
         $booking = Booking::find($data_create['booking_id']);
 
-        $result = Payment::where('booking_id', $data_create['booking_id'])->first();
-   
+        $result = Payment::where('booking_id', $data_create['booking_id'])
+            ->whereNotIn('payment_status', ['advanced_paid', 'paid'])
+            ->first();
+
         if ($data['vnp_ResponseCode'] === "00") {
             $result->other_transaction_detail = $vnp_ResponseCode[$data['vnp_ResponseCode']];
             $data_create['txn_id'] = $data['vnp_BankTranNo'];
@@ -181,8 +183,9 @@ class PaymentController extends Controller
         $type = $order_info_parts[8] . '_' . $order_info_parts[9];
 
         $data_create['other_transaction_detail'] = $data['message'];
-
-        $result = Payment::where('booking_id', $data_create['booking_id'])->first();
+        $result = Payment::where('booking_id', $data_create['booking_id'])
+        ->whereNotIn('payment_status', ['advanced_paid', 'paid'])
+        ->first();
         $booking = Booking::find($data_create['booking_id']);
 
         if ($data['resultCode'] === "0") {
