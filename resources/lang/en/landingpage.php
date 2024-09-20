@@ -26,6 +26,7 @@
   'on_basis' => 'on basis of 00:01 min',
   'extra_charges' => 'extra charges',
   'payment_detail' => 'payment detail',
+  'view_payment_list' => 'View payment list',
   'id' => 'ID',
   'transaction_id' => 'transaction ID',
   'request_invoice' => 'request invoice',

@@ -144,9 +144,9 @@ class BlogController extends Controller
      */
     public function store(BlogRequest $request)
     {
-        if(demoUserPermission()){
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if(demoUserPermission()){
+        //     return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $data = $request->all();
         $data['tags'] = isset($request->tags) ? json_encode($request->tags) : null;
         $data['author_id'] = !empty($request->author_id) ? $request->author_id : auth()->user()->id;
@@ -223,9 +223,9 @@ class BlogController extends Controller
      */
     public function destroy($id)
     {
-        if(demoUserPermission()){
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if(demoUserPermission()){
+        //     return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $blog = Blog::find($id);
         $msg= __('messages.msg_fail_to_delete',['name' => __('messages.blog')] );
 

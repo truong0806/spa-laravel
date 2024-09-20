@@ -170,11 +170,11 @@ class CategoryController extends Controller
      */
     public function store(CategoryRequest $request)
 {
-    if (demoUserPermission()) {
-        return redirect()->back()
-            ->withErrors(trans('messages.demo_permission_denied'))
-            ->withInput();
-    }
+    // if (demoUserPermission()) {
+    //     return redirect()->back()
+    //         ->withErrors(trans('messages.demo_permission_denied'))
+    //         ->withInput();
+    // }
 
     $data = $request->all();
     $data['is_featured'] = $request->has('is_featured') ? 1 : 0;
@@ -250,9 +250,9 @@ class CategoryController extends Controller
      */
     public function destroy($id)
     {
-        if(demoUserPermission()){
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if(demoUserPermission()){
+        //     return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $category = Category::find($id);
 
         $msg= __('messages.msg_fail_to_delete',['name' => __('messages.category')] );

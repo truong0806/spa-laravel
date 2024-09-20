@@ -100,7 +100,7 @@ class PaymentController extends Controller
     public function savePaymentVNPAY(Request $request)
     {
         $data = $request->all();
-        
+
         $order_info_parts = explode(" ", $data['vnp_OrderInfo']);
         $data_create['booking_id'] = intval($order_info_parts[4]);
         $data_create['total_amount'] = $order_info_parts[6];
@@ -179,20 +179,23 @@ class PaymentController extends Controller
         $data_create['booking_id'] = intval($order_info_parts[4]);
         $data_create['total_amount'] = $data['amount'];
         $data_create['discount'] = $order_info_parts[7];
+        $isMobile = $order_info_parts[8];
         $data_create['payment_type'] = 'momo';
-        $type = $order_info_parts[8] . '_' . $order_info_parts[9];
+        $type = $order_info_parts[9] . '_' . $order_info_parts[10];
 
         $data_create['other_transaction_detail'] = $data['message'];
         $result = Payment::where('booking_id', $data_create['booking_id'])
-        ->whereNotIn('payment_status', ['advanced_paid', 'paid'])
-        ->first();
+            ->whereNotIn('payment_status', ['advanced_paid', 'paid'])
+            ->first();
         $booking = Booking::find($data_create['booking_id']);
 
         if ($data['resultCode'] === "0") {
+            
             $result->other_transaction_detail = $data['message'];
             $data_create['txn_id'] = $data['orderId'];
 
             if ($type == 'advance_payment') {
+
                 $result->payment_status = 'advanced_paid';
             } else {
                 $result->payment_status = 'paid';
@@ -218,12 +221,21 @@ class PaymentController extends Controller
         ];
         $this->sendNotification($activity_data);
 
-        return redirect('/booking-list');
+        if ($isMobile) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Notification sent successfully.',
+            ]);
+        } else {
+            return redirect('/booking-list');
+        }
     }
 
     public function paymentList(Request $request)
     {
+
         $payment = Payment::myPayment()->with('booking');
+
         if ($request->has('booking_id') && !empty($request->booking_id)) {
             $payment->where('booking_id', $request->booking_id);
         }
@@ -233,6 +245,8 @@ class PaymentController extends Controller
                 $payment->where('payment_type', $request->payment_type);
             }
         }
+        $payment->whereIn('payment_status', ['paid', 'advanced_paid']);
+
         $per_page = config('constant.PER_PAGE_LIMIT');
         if ($request->has('per_page') && !empty($request->per_page)) {
             if (is_numeric($request->per_page)) {
@@ -244,6 +258,7 @@ class PaymentController extends Controller
         }
 
         $payment = $payment->orderBy('id', 'desc')->paginate($per_page);
+
         $items = PaymentResource::collection($payment);
 
         $response = [

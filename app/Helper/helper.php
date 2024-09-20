@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Plans;
 use \Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Google\Client as Google_Client;
@@ -2028,7 +2029,7 @@ function getPaymentMethodkey($type)
     $pyament_gateway = App\Models\PaymentGateway::query();
 
     $payment_geteway_value = null;
- 
+
     switch ($type) {
 
         case 'stripe':
@@ -2139,29 +2140,29 @@ function getstripepayments($data)
 function getvnpaypayments($data)
 {
     $vnpay_key_data = getPaymentMethodkey($data['payment_type']);
-    
-    $is_mobile = isset($data['is_mobile']) ? $data['is_mobile'] : 0;
     $vnp_Url = $vnpay_key_data['vnpay_url'];
     $vnp_TmnCode = $vnpay_key_data['vnpay_publickey'];
     $vnp_HashSecret = $vnpay_key_data['vnpay_key'];
     $vnp_IpAddr = request()->ip();
     $vnp_Locale = 'vn';
-    $resultType = str_replace('_', '', $data['type']);
-    $vnp_OrderInfo = 'Thanh toan don hang ' . $data['booking_id'] . ' ' . $data['customer_id'] . ' ' . $data['total_amount'] . ' ' . $data['discount'] . ' ' . $is_mobile . ' ' . $data['type'];
-   
+    $isMobile = isset($data['is_mobile']) ? 1 : 0;
+
+    if (isset($data['is_top_up']) && $data['is_top_up']) {
+        $vnp_OrderInfo = 'Khach hang' . ' ' . $data['customer_id'] . ' ' . 'topup';
+    } else if (isset($data['is_subscribe']) && $data['is_subscribe']) {
+        $sub = Plans::where('id', $data['sub_id'])->first();
+        $vnp_OrderInfo = 'Dang ky goi ' . $sub->identifier;
+    } else {
+        $vnp_OrderInfo = 'Thanh toan don hang ' . $data['booking_id'] . ' ' . $data['customer_id'] . ' ' . $data['total_amount'] . ' ' . $data['discount'] . ' ' . $isMobile . ' ' . $data['type'];
+    }
     $vnp_OrderType = 'billpayment';
     $vnp_Returnurl = route('payment.savevnpay');
     $vnp_TxnRef = uniqid() . mt_rand(1000, 9999);
     $timezone = new DateTimeZone('Asia/Ho_Chi_Minh');
-
     $currentDateTime = new DateTime('now', $timezone);
-
     $vnp_CreateDate = $currentDateTime->format('YmdHis');
-
     $createDateTime = DateTime::createFromFormat('YmdHis', $vnp_CreateDate, $timezone);
-
     $createDateTime->modify('+60 minutes');
-
     $vnp_ExpireDate = $createDateTime->format('YmdHis');
     $createDateTime1 = DateTime::createFromFormat('YmdHis', $vnp_CreateDate, $timezone);
     $expireDateTime1 = DateTime::createFromFormat('YmdHis', $vnp_ExpireDate, $timezone);
@@ -2196,7 +2197,6 @@ function getvnpaypayments($data)
     //     "vnp_ReturnUrl" => $vnp_Returnurl,
     //     "vnp_TxnRef" => $vnp_TxnRef,
     // );
-
     try {
         ksort($inputData);
         $query = "";
@@ -2211,17 +2211,14 @@ function getvnpaypayments($data)
             }
             $query .= urlencode($key) . "=" . urlencode($value) . '&';
         }
-
         $vnp_Url = $vnp_Url . "?" . $query;
         if (isset($vnp_HashSecret)) {
             $vnpSecureHash = hash_hmac('sha512', $hashData, $vnp_HashSecret);
             $vnp_Url .= 'vnp_SecureHash=' . $vnpSecureHash;
 
         }
-        $transaction_hash = hash('sha256', $vnp_TxnRef . $data['total_amount']);
-       
         $checkout_session = [
-            'id' => $transaction_hash,
+            'id' => $vnp_TxnRef,
             'url' => $vnp_Url,
             'createDateTime1' => $createDateTime1,
             'expireDateTime1' => $expireDateTime1,
@@ -2247,19 +2244,26 @@ function getmomopayments($data)
     $partnerCode = $momo_key_data['momo_partnerCode'];
     $redirectUrl = route('payment.savemomo');
     $ipnUrl = route('payment.savemomo');
-    ;
+
     $requestType = "payWithMethod";
     $lang = 'vi';
 
-    $orderId = $partnerCode . date('YmdHis');
-
+    $orderId = 'MOMO' . date('YmdHis');
     $requestId = $orderId;
+
     // $amount = $data['total_amount'];
     $amount = intval($data['total_amount']);
     // $amount = $data['booking_id'];
+    $isMobile = isset($data['is_mobile']) ? 1 : 0;
     $extraData = '';
-
-    $orderInfo = 'Thanh_toan_don_hang_' . $data['booking_id'] . '_' . $data['customer_id'] . '_' . $data['total_amount'] . '_' . $data['discount'] . '_' . $data['type'];
+    if (isset($data['is_top_up']) && $data['is_top_up']) {
+        $orderInfo = 'Khach_hang_' . $data['customer_id'] . '_' . $isMobile . '_' . 'topup';
+    } else if (isset($data['is_subscribe']) && $data['is_subscribe']) {
+        $sub = Plans::where('id', $data['sub_id'])->first();
+        $orderInfo = 'Dang ky goi ' . $sub->identifier;
+    } else {
+        $orderInfo = 'Thanh_toan_don_hang_' . $data['booking_id'] . '_' . $data['customer_id'] . '_' . $data['total_amount'] . '_' . $data['discount'] . '_' . $isMobile . '_' . $data['type'];
+    }
     $rawSignature = "accessKey=" . $accessKey . "&amount=" . $amount . "&extraData=" . $extraData . "&ipnUrl=" . $ipnUrl . "&orderId=" . $orderId . "&orderInfo=" . $orderInfo . "&partnerCode=" . $partnerCode . "&redirectUrl=" . $redirectUrl . "&requestId=" . $requestId . "&requestType=" . $requestType;
 
     $signature = hash_hmac('sha256', $rawSignature, $secretKey);
@@ -2291,7 +2295,6 @@ function getmomopayments($data)
             'id' => $responseData['orderId'],
             'url' => $responseData['payUrl']
         ];
-
     } catch (\Exception $e) {
         $message = $e->getMessage();
 

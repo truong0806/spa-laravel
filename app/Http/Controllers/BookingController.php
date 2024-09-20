@@ -13,6 +13,7 @@ use App\Models\PostJobRequest;
 use App\Models\ProviderAddressMapping;
 use App\Http\Requests\BookingUpdateRequest;
 use App\Models\Notification;
+use App\Http\Controllers\API\PaymentController;
 use Yajra\DataTables\DataTables;
 use PDF;
 use App\Models\AppSetting;
@@ -342,42 +343,49 @@ class BookingController extends Controller
      */
     public function show($id)
     {
-        $auth_user = authSession();
+        try {
+            $auth_user = authSession();
 
-        $user = auth()->user();
-        $user->last_notification_seen = now();
-        $user->save();
+            $user = auth()->user();
+            $user->last_notification_seen = now();
+            $user->save();
 
-        if (count($user->unreadNotifications) > 0) {
-
-            foreach ($user->unreadNotifications as $notifications) {
-
-                if ($notifications['data']['id'] == $id) {
-
-                    $notification = $user->unreadNotifications->where('id', $notifications['id'])->first();
-                    if ($notification) {
-                        $notification->markAsRead();
+            if (count($user->unreadNotifications) > 0) {
+                foreach ($user->unreadNotifications as $notifications) {
+                    if ($notifications['data']['id'] == $id) {
+                        $notification = $user->unreadNotifications->where('id', $notifications['id'])->first();
+                        if ($notification) {
+                            $notification->markAsRead();
+                        }
                     }
                 }
             }
+
+            $paymentsList = Payment::with('booking')
+                ->where('booking_id', $id)
+                ->whereIn('payment_status', ['advanced_paid', 'paid'])
+                ->get();
+
+            $bookingdata = Booking::with('bookingExtraCharge', 'payment')->myBooking()->find($id);
+
+            $tabpage = 'info';
+            if (empty($bookingdata)) {
+                $msg = __('messages.not_found_entry', ['name' => __('messages.booking')]);
+                return redirect(route('booking.index'))->withError($msg);
+            }
+            if (count($auth_user->unreadNotifications) > 0) {
+                $auth_user->unreadNotifications->where('data.id', $id)->markAsRead();
+            }
+
+            $pageTitle = __('messages.view_form_title', ['form' => __('messages.booking')]);
+
+            return view('booking.view', compact('pageTitle', 'bookingdata', 'auth_user', 'tabpage', 'paymentsList'));
+        } catch (\Exception $e) {
+            \Log::error('Error in BookingController@show: ' . $e->getMessage());
+            return redirect()->back()->withError(__('messages.error_occurred') . ': ' . $e->getMessage());
         }
-
-
-        $bookingdata = Booking::with('bookingExtraCharge', 'payment')->myBooking()->find($id);
-
-
-        $tabpage = 'info';
-        if (empty($bookingdata)) {
-            $msg = __('messages.not_found_entry', ['name' => __('messages.booking')]);
-            return redirect(route('booking.index'))->withError($msg);
-        }
-        if (count($auth_user->unreadNotifications) > 0) {
-            $auth_user->unreadNotifications->where('data.id', $id)->markAsRead();
-        }
-
-        $pageTitle = __('messages.view_form_title', ['form' => __('messages.booking')]);
-        return view('booking.view', compact('pageTitle', 'bookingdata', 'auth_user', 'tabpage'));
     }
+
 
     /**
      * Show the form for editing the specified resource.
@@ -407,9 +415,9 @@ class BookingController extends Controller
      */
     public function update(BookingUpdateRequest $request, $id)
     {
-        if (demoUserPermission()) {
-            return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if (demoUserPermission()) {
+        //     return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $data = $request->all();
 
 
@@ -494,9 +502,9 @@ class BookingController extends Controller
      */
     public function destroy($id)
     {
-        if (demoUserPermission()) {
-            return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if (demoUserPermission()) {
+        //     return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $booking = Booking::find($id);
 
         $msg = __('messages.msg_fail_to_delete', ['item' => __('messages.booking')]);
@@ -688,9 +696,21 @@ class BookingController extends Controller
         $user_id = $auth_user->id;
         $user_data = User::find($user_id);
         $bookingdata = Booking::with('handymanAdded', 'payment', 'bookingExtraCharge', 'bookingAddonService')->myBooking()->find($id);
+        $paymentsList = Payment::with('booking')
+            ->where('booking_id', $id)
+            ->whereIn('payment_status', ['advanced_paid', 'paid'])
+            ->get();
+
+        $bookingdata->paymentsList = $paymentsList;
+        $bookingdata->total_amount_paid = $paymentsList->sum('total_amount');
+        $bookingdata->remaining_amount = $bookingdata->total_amount - $bookingdata->total_amount_paid;
+
+        $paidPayment = $paymentsList->where('payment_status', 'paid')->sortByDesc('created_at')->first();
+        $bookingdata->payment = $paidPayment;
+
         switch ($tabpage) {
             case 'info':
-                $data = view('booking.' . $tabpage, compact('user_data', 'tabpage', 'auth_user', 'bookingdata'))->render();
+                $data = view('booking.' . $tabpage, compact('user_data', 'tabpage', 'auth_user', 'bookingdata', 'paymentsList'))->render();
                 break;
             case 'status':
                 $data = view('booking.' . $tabpage, compact('user_data', 'tabpage', 'auth_user', 'bookingdata'))->render();
@@ -741,19 +761,17 @@ class BookingController extends Controller
     {
         $data = $request->all();
         $data['datetime'] = now();
-
         $data['payment_status'] = 'failed';
-
         $payment_data = Payment::where('booking_id', $data['booking_id'])->first();
-        $data['total_amount'] = $data['total_amount'];
-        if (!empty($payment_data) && $data['type'] != 'full_payment') {
+
+        if (!empty($payment_data)) {
             $payment_data->update($data);
         } else {
             $payment_data = Payment::create($data);
         }
         $sitesetup = Setting::where('type', 'site-setup')->where('key', 'site-setup')->first();
         $sitesetupdata = $sitesetup ? json_decode($sitesetup->value, true) : null;
-       
+
         $country_id = $sitesetupdata['default_currency'] ?? null;
         $country = Country::find($country_id);
 
@@ -762,6 +780,7 @@ class BookingController extends Controller
         switch ($data['payment_type']) {
             case 'stripe':
                 $data['payment_geteway_data'] = getPaymentMethodkey($data['payment_type']);
+
                 break;
             case 'vnpay':
                 // $data['payment_geteway_data'] = getPaymentMethodkey($data['payment_type']);
@@ -800,13 +819,17 @@ class BookingController extends Controller
     {
 
         $data = $request->all();
+
         $checkout_session = getvnpaypayments($data);
+
         if (isset($checkout_session['message'])) {
 
             return comman_custom_response($checkout_session);
         } else {
+            if (!isset($data['is_mobile'])) {
+                Payment::where('booking_id', $data['booking_id'])->update(['txn_id' => $checkout_session['id'], 'payment_status' => 'pending']);
 
-            Payment::where('booking_id', $data['booking_id'])->update(['txn_id' => $checkout_session['id']]);
+            }
 
             return comman_custom_response($checkout_session);
         }
@@ -822,10 +845,9 @@ class BookingController extends Controller
             return comman_custom_response($checkout_session);
         } else {
 
-            payment::where('booking_id', $data['booking_id'])    
-                ->latest() 
-                ->first() 
-                ->update(['txn_id' => $checkout_session['id'],'payment_status' => 'pending']); 
+            if (!isset($data['is_mobile'])) {
+                Payment::where('booking_id', $data['booking_id'])->update(['txn_id' => $checkout_session['id'], 'payment_status' => 'pending']);
+            }
             return comman_custom_response($checkout_session);
         }
     }
@@ -880,7 +902,6 @@ class BookingController extends Controller
     {
 
         $type = $request->type;
-
         $result = Payment::where('booking_id', $id)->first();
 
         $stripe_session_id = $result->other_transaction_detail;

@@ -69,7 +69,9 @@
                         <div class="mt-5">
                            <a onclick="togglePayment()" id="pay_advance" class="btn btn-primary text-capitalize">{{__('landingpage.pay_now')}} ({{ getPriceFormat($bookingData['booking_detail']['total_amount'] - $bookingData['booking_detail']['advance_paid_amount']) }})</a>
                         </div>
+                        
                         @endif
+                        
                         @if($bookingData['booking_detail']['status'] === 'on_going')
                         <div class="mt-5">
                            <button type="button" id="startBooking" onclick="startBooking()" class="btn btn-success text-capitalize">{{__('landingpage.start')}}</button>
@@ -507,47 +509,9 @@
                   </div>
                   @endif
                   @if(!empty($bookingData['booking_detail']['payment_id']))
-                  <h6 class="mt-5 mb-3 font-size-18 text-capitalize">{{__('landingpage.payment_detail')}}</h6>
-                  <div class="table-responsive">
-                     <table class="table table-borderless mb-0">
-                        <tbody>
-                           <tr>
-                              <td class="ps-0">
-                                 <span class="text-capitalize">{{__('landingpage.id')}}</span>
-                              </td>
-                              <td class="pd-0">
-                                 <span class="d-block text-end">#{{ $bookingData['booking_detail']['payment_id'] }}</span>
-                              </td>
-                           </tr>
-                           <tr>
-                              <td class="ps-0">
-                                 <span class="text-capitalize">{{__('messages.method')}}</span>
-                              </td>
-                              <td class="pd-0">
-                                 <span class="d-block text-end text-capitalize">{{ $bookingData['booking_detail']['payment_method'] }}</span>
-                              </td>
-                           </tr>
-                           <tr>
-                              <td class="ps-0">
-                                 <span class="text-capitalize">{{__('messages.status')}}</span>
-                              </td>
-                              <td class="pd-0">
-                                 <span class="d-block text-end text-capitalize">{{ str_replace("_"," ",$bookingData['booking_detail']['payment_status']) }}</span>
-                              </td>
-                           </tr>
-                           @if($bookingData['booking_detail']['txn_id'])
-                           <tr>
-                              <td class="ps-0">
-                                 <span class="text-capitalize">{{__('landingpage.transaction_id')}}</span>
-                              </td>
-                              <td class="pd-0">
-                                 <span class="d-block text-end">{{ $bookingData['booking_detail']['txn_id'] }}</span>
-                              </td>
-                           </tr>
-                           @endif
-                        </tbody>
-                     </table>
-                  </div>
+                  <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#paymentsModalInfo">
+                     {{__('landingpage.view_payment_list')}}
+                  </button>
                   @endif
                </div>
             </div>
@@ -663,8 +627,48 @@
       </div>
    </div>
 </div>
-
-
+<div class="modal fade" id="paymentsModalInfo" tabindex="-1" role="dialog" aria-labelledby="paymentsModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content custom-modal-info-pay">
+            <div class="modal-header">
+                <h5 class="modal-title text-capitalize" id="paymentsModalLabel">Payments List</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <div class="row">
+                        @if(!empty($bookingData['paymentlist']))
+                            @foreach ($bookingData['paymentlist'] as $payment)
+                                <div class="col-12">
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <h4 class="card-title" style="color: green;">
+                                                {{ getPriceFormat($payment['total_amount']) }} ({{ $payment['payment_type'] }})
+                                            </h4>
+                                            <p class="card-text">
+                                                <strong>Status:</strong> {{ ucwords(str_replace('_', ' ', $payment['payment_status'])) }}<br>
+                                                <strong>Transaction ID:</strong> {{ $payment['txn_id'] }}<br>
+                                                <strong>Created At:</strong> {{ \Carbon\Carbon::parse($payment['created_at'])->format('d/m/Y H:i:s') }}<br>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        @else
+                            <p>No payment records found.</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- ===================
 Review Modal
 ========================== -->
@@ -990,6 +994,11 @@ Reason Modal
 
 
 </script>
+<style>
+   .custom-modal-info-pay {
+      max-width: 80%; 
+   }
+</style>
 
 
 @endsection

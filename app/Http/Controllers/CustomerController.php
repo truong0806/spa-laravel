@@ -205,9 +205,9 @@ class CustomerController extends Controller
      */
     public function store(UserRequest $request)
     {
-        if(demoUserPermission()){
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if(demoUserPermission()){
+        //     return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $data = $request->all();
         $id = $data['id'];
         $data['user_type'] = $data['user_type'] ?? 'user';
@@ -284,9 +284,9 @@ class CustomerController extends Controller
      */
     public function destroy($id)
     {
-        if(demoUserPermission()){
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if(demoUserPermission()){
+        //     return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $user = User::find($id);
         $msg = __('messages.msg_fail_to_delete',['item' => __('messages.user')] );
         

@@ -164,9 +164,9 @@ class CouponController extends Controller
      */
     public function store(CouponRequest $request)
     {
-        if(demoUserPermission()){
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if(demoUserPermission()){
+        //     return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $data = $request->all();
 
         $data['expire_date'] = isset($request->expire_date) ? date('Y-m-d H:i:s',strtotime($request->expire_date)) : date('Y-m-d H:i:s');
@@ -239,9 +239,9 @@ class CouponController extends Controller
      */
     public function destroy($id)
     {
-        if(demoUserPermission()){
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if(demoUserPermission()){
+        //     return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $coupon = Coupon::find($id);
         
         $msg = __('messages.msg_fail_to_delete',['item' => __('messages.coupon')] );

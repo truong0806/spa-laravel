@@ -157,9 +157,9 @@ class BankController extends Controller
      */
     public function store(BankRequest $request)
     {
-        if (demoUserPermission()) {
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if (demoUserPermission()) {
+        //     return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $data = $request->all();
         if (auth()->user()->hasRole('provider')) {
             $data['provider_id'] = auth()->id();
@@ -277,12 +277,12 @@ class BankController extends Controller
      */
     public function destroy($id)
     {
-        if(demoUserPermission()){
-            if(request()->is('api/*')){
-                return comman_message_response( __('messages.demo_permission_denied') );
-            }
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
+        // if(demoUserPermission()){
+        //     if(request()->is('api/*')){
+        //         return comman_message_response( __('messages.demo_permission_denied') );
+        //     }
+        //     return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        // }
         $bank = Bank::find($id);
         $msg= __('messages.msg_fail_to_delete',['item' => __('messages.bank')] );
 

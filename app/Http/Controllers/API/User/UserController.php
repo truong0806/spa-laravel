@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Service;
 use App\Http\Requests\UserRequest;
-use Hash; 
+use Hash;
 use App\Http\Resources\API\UserResource;
 use App\Http\Resources\API\ServiceResource;
 use Illuminate\Support\Facades\Password;
@@ -29,7 +29,7 @@ class UserController extends Controller
     use NotificationTrait;
     public function register(UserRequest $request)
     {
-        $sitesetup = Setting::where('type','site-setup')->where('key', 'site-setup')->first();
+        $sitesetup = Setting::where('type', 'site-setup')->where('key', 'site-setup')->first();
         $admin = json_decode($sitesetup->value);
         date_default_timezone_set($admin->time_zone ?? 'UTC');
         $input = $request->all();
@@ -37,22 +37,21 @@ class UserController extends Controller
         $email = $input['email'];
         $username = $input['username'];
         $password = $input['password'];
-        $input['display_name'] = $input['first_name']." ".$input['last_name'];
+        $input['display_name'] = $input['first_name'] . " " . $input['last_name'];
         $input['user_type'] = isset($input['user_type']) ? $input['user_type'] : 'user';
         $input['password'] = Hash::make($password);
 
-        if( in_array($input['user_type'],['handyman', 'provider']))
-        {
-            $input['status'] = isset($input['status']) ? $input['status']: 0;
+        if (in_array($input['user_type'], ['handyman', 'provider'])) {
+            $input['status'] = isset($input['status']) ? $input['status'] : 0;
         }
         $user = User::withTrashed()
-        ->where(function ($query) use ($email, $username) {
-            $query->where('email', $email)->orWhere('username', $username);
-        })
-        ->first();
+            ->where(function ($query) use ($email, $username) {
+                $query->where('email', $email)->orWhere('username', $username);
+            })
+            ->first();
 
-        if($user){
-            if($user->deleted_at == null){
+        if ($user) {
+            if ($user->deleted_at == null) {
 
                 $message = trans('messages.login_form');
                 $response = [
@@ -66,13 +65,12 @@ class UserController extends Controller
                 'Isdeactivate' => 1,
             ];
             return comman_custom_response($response);
-        }
-        else{
+        } else {
             $user = User::create($input);
             if ($user->user_type == 'user' || $user->user_type == 'provider' || $user->user_type == 'handyman') {
                 $id = $user->id;
                 $user->assignRole($input['user_type']);
-                $verificationLink = route('verify',['id' => $id]);
+                $verificationLink = route('verify', ['id' => $id]);
                 Mail::to($user->email)->send(new VerificationEmail($verificationLink));
                 $message = 'Email Verification link has been sent to your email. Please Check your inbox';
                 $response = [
@@ -94,7 +92,7 @@ class UserController extends Controller
 
         }
 
-        if($user->user_type == 'provider' || $user->user_type == 'user'){
+        if ($user->user_type == 'provider' || $user->user_type == 'user') {
             $wallet = array(
                 'title' => $user->display_name,
                 'user_id' => $user->id,
@@ -102,9 +100,9 @@ class UserController extends Controller
             );
             $result = Wallet::create($wallet);
         }
-        if(!empty($input['loginfrom']) && $input['loginfrom'] === 'vue-app'){
-            if($user->user_type != 'user'){
-                $message = trans('messages.save_form',['form' => $input['user_type'] ]);
+        if (!empty($input['loginfrom']) && $input['loginfrom'] === 'vue-app') {
+            if ($user->user_type != 'user') {
+                $message = trans('messages.save_form', ['form' => $input['user_type']]);
                 $response = [
                     'message' => $message,
                     'data' => $user
@@ -117,7 +115,7 @@ class UserController extends Controller
         $input['api_token'] = $user->createToken('auth_token')->plainTextToken;
 
         unset($input['password']);
-        $message = trans('messages.save_form',['form' => $input['user_type'] ]);
+        $message = trans('messages.save_form', ['form' => $input['user_type']]);
 
         $user->api_token = $user->createToken('auth_token')->plainTextToken;
         $response = [
@@ -139,31 +137,30 @@ class UserController extends Controller
 
     public function login(Request $request)
     {
-        // dd($request->all());
         $Isactivate = request('Isactivate');
-        if($Isactivate == 1){
+        if ($Isactivate == 1) {
             $user = User::withTrashed()
-            ->where('email', request('email'))
-            ->first();
-            if($user){
+                ->where('email', request('email'))
+                ->first();
+            if ($user) {
                 $user->restore();
-            }else{
+            } else {
                 $message = trans('auth.failed');
                 return comman_message_response($message, 406);
             }
 
         }
 
-        if(Auth::attempt(['email' => request('email'), 'password' => request('password')])){
+        if (Auth::attempt(['email' => request('email'), 'password' => request('password')])) {
 
             $user = Auth::user();
-            if($user->status == 0){
+            if ($user->status == 0) {
                 Auth::logout();
             }
-            if(request('loginfrom') === 'vue-app'){
-                if($user->user_type != 'user'){
+            if (request('loginfrom') === 'vue-app') {
+                if ($user->user_type != 'user') {
                     $message = trans('auth.not_able_login');
-                    return comman_message_response($message,400);
+                    return comman_message_response($message, 400);
                 }
             }
             $user->save();
@@ -171,24 +168,23 @@ class UserController extends Controller
             $success = $user;
             $success['user_role'] = $user->getRoleNames();
             $success['api_token'] = $user->createToken('auth_token')->plainTextToken;
-            $success['profile_image'] = getSingleMedia($user,'profile_image',null);
+            $success['profile_image'] = getSingleMedia($user, 'profile_image', null);
             $is_verify_provider = false;
 
-            if($user->user_type == 'provider')
-            {
+            if ($user->user_type == 'provider') {
                 $is_verify_provider = verify_provider_document($user->id);
                 $success['subscription'] = get_user_active_plan($user->id);
 
-                if(is_any_plan_active($user->id) == 0 && $success['is_subscribe'] == 0 ){
+                if (is_any_plan_active($user->id) == 0 && $success['is_subscribe'] == 0) {
                     $success['subscription'] = user_last_plan($user->id);
                 }
                 $success['is_subscribe'] = is_subscribed_user($user->id);
                 $success['provider_id'] = admin_id();
 
             }
-            if($user->user_type == 'provider' || $user->user_type == 'user'){
-                $wallet = Wallet::where('user_id',$user->id)->first();
-                if( $wallet == null){
+            if ($user->user_type == 'provider' || $user->user_type == 'user') {
+                $wallet = Wallet::where('user_id', $user->id)->first();
+                if ($wallet == null) {
                     $wallet = array(
                         'title' => $user->display_name,
                         'user_id' => $user->id,
@@ -201,11 +197,10 @@ class UserController extends Controller
             unset($success['media']);
             unset($user['roles']);
 
-                return response()->json([ 'data' => $success ], 200 );
-        }
-        else{
+            return response()->json(['data' => $success], 200);
+        } else {
             $message = trans('auth.failed');
-            return comman_message_response($message,406);
+            return comman_message_response($message, 406);
         }
     }
 
@@ -214,56 +209,51 @@ class UserController extends Controller
         $user_type = isset($request['user_type']) ? $request['user_type'] : 'handyman';
         $status = isset($request['status']) ? $request['status'] : 1;
 
-        $user_list = User::orderBy('id','desc')->where('user_type',$user_type);
-        if(!empty($status)){
-            $user_list = $user_list->where('status',$status);
+        $user_list = User::orderBy('id', 'desc')->where('user_type', $user_type);
+        if (!empty($status)) {
+            $user_list = $user_list->where('status', $status);
         }
 
-        if(default_earning_type() === 'subscription' && $user_type == 'provider' && auth()->user() !== null && !auth()->user()->hasRole('admin')){
-            $user_list = $user_list->where('is_subscribe',1);
+        if (default_earning_type() === 'subscription' && $user_type == 'provider' && auth()->user() !== null && !auth()->user()->hasRole('admin')) {
+            $user_list = $user_list->where('is_subscribe', 1);
         }
 
-        if(auth()->user() !== null && auth()->user()->hasRole('admin')){
+        if (auth()->user() !== null && auth()->user()->hasRole('admin')) {
             $user_list = $user_list->withTrashed();
-            if($request->has('keyword') && isset($request->keyword))
-            {
-                $user_list = $user_list->where('display_name','like','%'.$request->keyword.'%');
+            if ($request->has('keyword') && isset($request->keyword)) {
+                $user_list = $user_list->where('display_name', 'like', '%' . $request->keyword . '%');
             }
-            if($user_type == 'handyman' && $status == 0){
-                $user_list = $user_list->orWhere('provider_id',NULL)->where('user_type' ,'handyman');
+            if ($user_type == 'handyman' && $status == 0) {
+                $user_list = $user_list->orWhere('provider_id', NULL)->where('user_type', 'handyman');
             }
-            if($user_type == 'handyman' && $status == 1){
-                $user_list = $user_list->whereNotNull('provider_id')->where('user_type' ,'handyman');
+            if ($user_type == 'handyman' && $status == 1) {
+                $user_list = $user_list->whereNotNull('provider_id')->where('user_type', 'handyman');
             }
 
         }
-        if($request->has('provider_id'))
-        {
-            $user_list = $user_list->where('provider_id',$request->provider_id);
+        if ($request->has('provider_id')) {
+            $user_list = $user_list->where('provider_id', $request->provider_id);
         }
-        if($request->has('city_id') && !empty($request->city_id))
-        {
-            $user_list = $user_list->where('city_id',$request->city_id);
+        if ($request->has('city_id') && !empty($request->city_id)) {
+            $user_list = $user_list->where('city_id', $request->city_id);
         }
-        if($request->has('keyword') && isset($request->keyword))
-        {
-            $user_list = $user_list->where('display_name','like','%'.$request->keyword.'%');
+        if ($request->has('keyword') && isset($request->keyword)) {
+            $user_list = $user_list->where('display_name', 'like', '%' . $request->keyword . '%');
         }
-        if($request->has('booking_id')){
+        if ($request->has('booking_id')) {
             $booking_data = Booking::find($request->booking_id);
 
             $service_address = $booking_data->handymanByAddress;
-            if($service_address != null)
-            {
+            if ($service_address != null) {
                 $user_list = $user_list->where('service_address_id', $service_address->id);
             }
         }
         $per_page = config('constant.PER_PAGE_LIMIT');
-        if( $request->has('per_page') && !empty($request->per_page)){
-            if(is_numeric($request->per_page)){
+        if ($request->has('per_page') && !empty($request->per_page)) {
+            if (is_numeric($request->per_page)) {
                 $per_page = $request->per_page;
             }
-            if($request->per_page === 'all' ){
+            if ($request->per_page === 'all') {
                 $per_page = $user_list->count();
             }
         }
@@ -295,9 +285,9 @@ class UserController extends Controller
 
         $user = User::find($id);
         $message = __('messages.detail');
-        if(empty($user)){
+        if (empty($user)) {
             $message = __('messages.user_not_found');
-            return comman_message_response($message,400);
+            return comman_message_response($message, 400);
         }
 
         $service = [];
@@ -305,25 +295,24 @@ class UserController extends Controller
         $handyman = [];
         $profile_array = [];
 
-        if($user->user_type == 'provider')
-        {
-            $service = Service::where('provider_id',$id)->where('status',1)->orderBy('id','desc')->paginate(10);
+        if ($user->user_type == 'provider') {
+            $service = Service::where('provider_id', $id)->where('status', 1)->orderBy('id', 'desc')->paginate(10);
             $service = ServiceResource::collection($service);
-            $handyman_rating = HandymanRating::where('handyman_id',$id)->orderBy('id','desc')->paginate(10);
+            $handyman_rating = HandymanRating::where('handyman_id', $id)->orderBy('id', 'desc')->paginate(10);
             $handyman_rating = HandymanRatingResource::collection($handyman_rating);
-            $handyman_staff = User::where('user_type','handyman')->where('provider_id',$id)->where('is_available',1)->get();
+            $handyman_staff = User::where('user_type', 'handyman')->where('provider_id', $id)->where('is_available', 1)->get();
             $handyman = UserResource::collection($handyman_staff);
 
-            if(!empty($handyman_staff)){
+            if (!empty($handyman_staff)) {
                 foreach ($handyman_staff as $image) {
-                    $profile_array[] = $image->login_type !== null ? $image->social_image : getSingleMedia($image, 'profile_image',null);
+                    $profile_array[] = $image->login_type !== null ? $image->social_image : getSingleMedia($image, 'profile_image', null);
                 }
             }
         }
         $user_detail = new UserResource($user);
-        $document = ProviderDocument::where('provider_id',$id)->get();        
-        if($user->user_type == 'handyman'){
-            $handyman_rating = HandymanRating::where('handyman_id',$id)->orderBy('id','desc')->paginate(10);
+        $document = ProviderDocument::where('provider_id', $id)->get();
+        if ($user->user_type == 'handyman') {
+            $handyman_rating = HandymanRating::where('handyman_id', $id)->orderBy('id', 'desc')->paginate(10);
             $handyman_rating = HandymanRatingResource::collection($handyman_rating);
         }
 
@@ -339,12 +328,13 @@ class UserController extends Controller
 
     }
 
-    public function changePassword(Request $request){
-        $user = User::where('id',\Auth::user()->id)->first();
+    public function changePassword(Request $request)
+    {
+        $user = User::where('id', \Auth::user()->id)->first();
 
-        if($user == "") {
+        if ($user == "") {
             $message = __('messages.user_not_found');
-            return comman_message_response($message,406);
+            return comman_message_response($message, 406);
         }
 
         $hashedPassword = $user->password;
@@ -352,22 +342,19 @@ class UserController extends Controller
         $match = Hash::check($request->old_password, $hashedPassword);
 
         $same_exits = Hash::check($request->new_password, $hashedPassword);
-        if ($match)
-        {
-            if($same_exits){
+        if ($match) {
+            if ($same_exits) {
                 $message = __('messages.old_new_pass_same');
-                return comman_message_response($message,406);
+                return comman_message_response($message, 406);
             }
 
-			$user->fill([
+            $user->fill([
                 'password' => Hash::make($request->new_password)
             ])->save();
 
             $message = __('messages.password_change');
-            return comman_message_response($message,200);
-        }
-        else
-        {
+            return comman_message_response($message, 200);
+        } else {
             $message = __('messages.valid_password');
             return comman_message_response($message);
         }
@@ -376,31 +363,31 @@ class UserController extends Controller
     public function updateProfile(Request $request)
     {
         $user = \Auth::user();
-        if($request->has('id') && !empty($request->id)){
-            $user = User::where('id',$request->id)->first();
+        if ($request->has('id') && !empty($request->id)) {
+            $user = User::where('id', $request->id)->first();
         }
-        if($user == null){
-            return comman_message_response(__('messages.no_record_found'),400);
+        if ($user == null) {
+            return comman_message_response(__('messages.no_record_found'), 400);
         }
 
-        $data=$request->all();
+        $data = $request->all();
 
-        $why_choose_me=[
+        $why_choose_me = [
 
-            'why_choose_me_title'=>$request->why_choose_me_title,
+            'why_choose_me_title' => $request->why_choose_me_title,
             'why_choose_me_reason' => isset($request->why_choose_me_reason) && is_string($request->why_choose_me_reason)
-            ? array_filter(json_decode($request->why_choose_me_reason), function ($value) {
-                return $value !== null;
-            })
-            : null,
+                ? array_filter(json_decode($request->why_choose_me_reason), function ($value) {
+                    return $value !== null;
+                })
+                : null,
 
         ];
 
-        $data['why_choose_me']=($why_choose_me);
+        $data['why_choose_me'] = ($why_choose_me);
 
         $user->fill($data)->update();
 
-        if(isset($request->profile_image) && $request->profile_image != null ) {
+        if (isset($request->profile_image) && $request->profile_image != null) {
             $user->clearMediaCollection('profile_image');
             $user->addMediaFromRequest('profile_image')->toMediaCollection('profile_image');
         }
@@ -409,15 +396,15 @@ class UserController extends Controller
 
         $message = __('messages.updated');
 
-        if($user->login_type !== null && $user->login_type !== 'mobile'){
-           
-            $user_data['profile_image'] =$user->social_image ? $user->social_image : getSingleMedia($user_data, 'profile_image', null);
+        if ($user->login_type !== null && $user->login_type !== 'mobile') {
 
-        }else{
-            
-            $user_data['profile_image'] =$user->profile_image ? $user->profile_image : getSingleMedia($user_data, 'profile_image', null);
+            $user_data['profile_image'] = $user->social_image ? $user->social_image : getSingleMedia($user_data, 'profile_image', null);
+
+        } else {
+
+            $user_data['profile_image'] = $user->profile_image ? $user->profile_image : getSingleMedia($user_data, 'profile_image', null);
         }
-      
+
         $user_data['user_role'] = $user->getRoleNames();
 
         unset($user_data['roles']);
@@ -427,26 +414,27 @@ class UserController extends Controller
             'data' => $user_data,
             'message' => $message
         ];
-        return comman_custom_response( $response );
+        return comman_custom_response($response);
     }
 
-    public function logout(Request $request){
+    public function logout(Request $request)
+    {
         $auth = Auth::user();
 
-        if($request->is('api*')){
+        if ($request->is('api*')) {
 
-           if(!Auth::guard('sanctum')->check()) {
-            return response()->json(['status' => false, 'message' => __('messages.user_not_logged_in')]);
-           }
+            if (!Auth::guard('sanctum')->check()) {
+                return response()->json(['status' => false, 'message' => __('messages.user_not_logged_in')]);
+            }
 
-          $user = Auth::guard('sanctum')->user();
+            $user = Auth::guard('sanctum')->user();
 
-          $user->tokens()->delete();
+            $user->tokens()->delete();
 
-        return comman_message_response('Logout successfully');
+            return comman_message_response('Logout successfully');
 
-       }
-         Auth::logout();
+        }
+        Auth::logout();
 
         return comman_message_response('Logout successfully');
 
@@ -471,21 +459,21 @@ class UserController extends Controller
     {
         $input = $request->all();
 
-        if($input['login_type'] === 'mobile'){
-            $user_data = User::where('username',$input['username'])->where('login_type','mobile')->first();
-        }else{
-            $user_data = User::where('email',$input['email'])->first();
+        if ($input['login_type'] === 'mobile') {
+            $user_data = User::where('username', $input['username'])->where('login_type', 'mobile')->first();
+        } else {
+            $user_data = User::where('email', $input['email'])->first();
 
         }
 
-        if( $user_data != null ) {
-            if( !isset($user_data->login_type) || $user_data->login_type  == '' ){
-                if($request->login_type === 'google'){
-                    $message = __('validation.unique',['attribute' => 'email' ]);
+        if ($user_data != null) {
+            if (!isset($user_data->login_type) || $user_data->login_type == '') {
+                if ($request->login_type === 'google') {
+                    $message = __('validation.unique', ['attribute' => 'email']);
                 } else {
-                    $message = __('validation.unique',['attribute' => 'username' ]);
+                    $message = __('validation.unique', ['attribute' => 'username']);
                 }
-                return comman_message_response($message,400);
+                return comman_message_response($message, 400);
             }
 
             $user_data->update($input);
@@ -493,8 +481,7 @@ class UserController extends Controller
             $message = __('messages.login_success');
         } else {
 
-            if($request->login_type === 'google')
-            {
+            if ($request->login_type === 'google') {
                 $key = 'email';
                 $value = $request->email;
             } else {
@@ -502,26 +489,25 @@ class UserController extends Controller
                 $value = $request->username;
             }
 
-            $trashed_user_data = User::where($key,$value)->whereNotNull('login_type')->withTrashed()->first();
+            $trashed_user_data = User::where($key, $value)->whereNotNull('login_type')->withTrashed()->first();
 
-            if ($trashed_user_data != null && $trashed_user_data->trashed())
-            {
-                if($request->login_type === 'google'){
-                    $message = __('validation.unique',['attribute' => 'email' ]);
+            if ($trashed_user_data != null && $trashed_user_data->trashed()) {
+                if ($request->login_type === 'google') {
+                    $message = __('validation.unique', ['attribute' => 'email']);
                 } else {
-                    $message = __('validation.unique',['attribute' => 'username' ]);
+                    $message = __('validation.unique', ['attribute' => 'username']);
                 }
-                return comman_message_response($message,400);
+                return comman_message_response($message, 400);
             }
 
-            if($request->login_type === 'mobile' && $user_data == null ){
+            if ($request->login_type === 'mobile' && $user_data == null) {
                 $otp_response = [
                     'status' => true,
                     'is_user_exist' => false
                 ];
                 return comman_custom_response($otp_response);
             }
-            if($request->login_type === 'mobile' && $user_data != null){
+            if ($request->login_type === 'mobile' && $user_data != null) {
                 $otp_response = [
                     'status' => true,
                     'is_user_exist' => true
@@ -531,25 +517,25 @@ class UserController extends Controller
 
             $password = !empty($input['accessToken']) ? $input['accessToken'] : $input['email'];
 
-            $input['user_type']  = "user";
-            $input['display_name'] = $input['first_name']." ".$input['last_name'];
+            $input['user_type'] = "user";
+            $input['display_name'] = $input['first_name'] . " " . $input['last_name'];
             $input['password'] = Hash::make($password);
             $input['user_type'] = isset($input['user_type']) ? $input['user_type'] : 'user';
             $user = User::create($input);
 
             $user->assignRole($input['user_type']);
 
-            $user_data = User::where('id',$user->id)->first();
-            $message = trans('messages.save_form',['form' => $input['user_type'] ]);
+            $user_data = User::where('id', $user->id)->first();
+            $message = trans('messages.save_form', ['form' => $input['user_type']]);
         }
 
         $user_data['api_token'] = $user_data->createToken('auth_token')->plainTextToken;
-        if($user_data->login_type !== null && $user_data->login_type !== 'mobile'){
-           
+        if ($user_data->login_type !== null && $user_data->login_type !== 'mobile') {
+
             $user_data['profile_image'] = $user_data->social_image ? $user_data->social_image : getSingleMedia($user_data, 'profile_image', null);
 
-        }else{
-            
+        } else {
+
             $user_data['profile_image'] = $user_data->profile_image ? $user_data->profile_image : getSingleMedia($user_data, 'profile_image', null);
         }
         $response = [
@@ -562,38 +548,41 @@ class UserController extends Controller
 
     public function userStatusUpdate(Request $request)
     {
-        $user_id =  $request->id;
-        $user = User::where('id',$user_id)->first();
+        $user_id = $request->id;
+        $user = User::where('id', $user_id)->first();
 
-        if($user == "") {
+        if ($user == "") {
             $message = __('messages.user_not_found');
-            return comman_message_response($message,400);
+            return comman_message_response($message, 400);
         }
         $user->status = $request->status;
         $user->save();
 
-        $message = __('messages.update_form',['form' => __('messages.status') ]);
+        $message = __('messages.update_form', ['form' => __('messages.status')]);
         $response = [
             'data' => new UserResource($user),
             'message' => $message
         ];
         return comman_custom_response($response);
     }
-    public function contactUs(Request $request){
+    public function contactUs(Request $request)
+    {
         try {
-            \Mail::send('contactus.contact_email',
-            array(
-                'first_name' => $request->get('first_name'),
-                'last_name' => $request->get('last_name'),
-                'email' => $request->get('email'),
-                'subject' => $request->get('subject'),
-                'phone_no' => $request->get('phone_no'),
-                'user_message' => $request->get('user_message'),
-            ), function($message) use ($request)
-            {
-                $message->from($request->email);
-                $message->to(env('MAIL_FROM_ADDRESS'));
-            });
+            \Mail::send(
+                'contactus.contact_email',
+                array(
+                    'first_name' => $request->get('first_name'),
+                    'last_name' => $request->get('last_name'),
+                    'email' => $request->get('email'),
+                    'subject' => $request->get('subject'),
+                    'phone_no' => $request->get('phone_no'),
+                    'user_message' => $request->get('user_message'),
+                ),
+                function ($message) use ($request) {
+                    $message->from($request->email);
+                    $message->to(env('MAIL_FROM_ADDRESS'));
+                }
+            );
             $messagedata = __('messages.contact_us_greetings');
             return comman_message_response($messagedata);
         } catch (\Throwable $th) {
@@ -602,40 +591,42 @@ class UserController extends Controller
         }
 
     }
-    public function handymanAvailable(Request $request){
-        $user_id =  $request->id;
-        $user = User::where('id',$user_id)->first();
+    public function handymanAvailable(Request $request)
+    {
+        $user_id = $request->id;
+        $user = User::where('id', $user_id)->first();
 
-        if($user == "") {
+        if ($user == "") {
             $message = __('messages.user_not_found');
-            return comman_message_response($message,400);
+            return comman_message_response($message, 400);
         }
         $user->is_available = $request->is_available;
         $user->save();
 
-        $message = __('messages.update_form',['form' => __('messages.status') ]);
+        $message = __('messages.update_form', ['form' => __('messages.status')]);
         $response = [
             'data' => new UserResource($user),
             'message' => $message
         ];
         return comman_custom_response($response);
     }
-    public function handymanReviewsList(Request $request){
+    public function handymanReviewsList(Request $request)
+    {
         $id = $request->handyman_id;
-        $handyman_rating_data = HandymanRating::where('handyman_id',$id);
+        $handyman_rating_data = HandymanRating::where('handyman_id', $id);
 
         $per_page = config('constant.PER_PAGE_LIMIT');
 
-        if( $request->has('per_page') && !empty($request->per_page)){
-            if(is_numeric($request->per_page)){
+        if ($request->has('per_page') && !empty($request->per_page)) {
+            if (is_numeric($request->per_page)) {
                 $per_page = $request->per_page;
             }
-            if($request->per_page === 'all' ){
+            if ($request->per_page === 'all') {
                 $per_page = $handyman_rating_data->count();
             }
         }
 
-        $handyman_rating_data = $handyman_rating_data->orderBy('created_at','desc')->paginate($per_page);
+        $handyman_rating_data = $handyman_rating_data->orderBy('created_at', 'desc')->paginate($per_page);
 
         $items = HandymanRatingResource::collection($handyman_rating_data);
         $response = [
@@ -653,72 +644,75 @@ class UserController extends Controller
         ];
         return comman_custom_response($response);
     }
-    public function deleteUserAccount(Request $request){
+    public function deleteUserAccount(Request $request)
+    {
         $user_id = \Auth::user()->id;
-        $user = User::where('id',$user_id)->first();
-        if($user == null){
-            $message = __('messages.user_not_found');__('messages.msg_fail_to_delete',['item' => __('messages.user')] );
-            return comman_message_response($message,400);
+        $user = User::where('id', $user_id)->first();
+        if ($user == null) {
+            $message = __('messages.user_not_found');
+            __('messages.msg_fail_to_delete', ['item' => __('messages.user')]);
+            return comman_message_response($message, 400);
         }
         $user->booking()->forceDelete();
         $user->payment()->forceDelete();
         $user->forceDelete();
-        $message = __('messages.msg_deleted',['name' => __('messages.user')] );
-        return comman_message_response($message,200);
+        $message = __('messages.msg_deleted', ['name' => __('messages.user')]);
+        return comman_message_response($message, 200);
     }
-    public function deleteAccount(Request $request){
+    public function deleteAccount(Request $request)
+    {
         $user_id = \Auth::user()->id;
-        $user = User::where('id',$user_id)->first();
-        if($user == null){
-            $message = __('messages.user_not_found');__('messages.msg_fail_to_delete',['item' => __('messages.user')] );
-            return comman_message_response($message,400);
+        $user = User::where('id', $user_id)->first();
+        if ($user == null) {
+            $message = __('messages.user_not_found');
+            __('messages.msg_fail_to_delete', ['item' => __('messages.user')]);
+            return comman_message_response($message, 400);
         }
-        if($user->user_type == 'provider'){
-            if($user->providerPendingBooking()->count() == 0){
+        if ($user->user_type == 'provider') {
+            if ($user->providerPendingBooking()->count() == 0) {
                 $user->providerService()->forceDelete();
                 $user->providerPendingBooking()->forceDelete();
-                $provider_handyman = User::where('provider_id',$user_id)->get();
-                if(count($provider_handyman) > 0){
+                $provider_handyman = User::where('provider_id', $user_id)->get();
+                if (count($provider_handyman) > 0) {
                     foreach ($provider_handyman as $key => $value) {
                         $value->provider_id = NULL;
                         $value->update();
                     }
                 }
                 $user->forceDelete();
-            }else{
+            } else {
                 $message = __('messages.pending_booking');
-                 return comman_message_response($message,400);
+                return comman_message_response($message, 400);
             }
-        }else{
-            if($user->handymanPendingBooking()->count() == 0){
+        } else {
+            if ($user->handymanPendingBooking()->count() == 0) {
                 $user->handymanPendingBooking()->forceDelete();
                 $user->forceDelete();
-            }else{
+            } else {
                 $message = __('messages.pending_booking');
-                 return comman_message_response($message,400);
+                return comman_message_response($message, 400);
             }
         }
-        $message = __('messages.msg_deleted',['name' => __('messages.user')] );
-        return comman_message_response($message,200);
+        $message = __('messages.msg_deleted', ['name' => __('messages.user')]);
+        return comman_message_response($message, 200);
     }
     public function addUser(UserRequest $request)
     {
         $input = $request->all();
 
         $password = $input['password'];
-        $input['display_name'] = $input['first_name']." ".$input['last_name'];
+        $input['display_name'] = $input['first_name'] . " " . $input['last_name'];
         $input['user_type'] = isset($input['user_type']) ? $input['user_type'] : 'user';
         $input['password'] = Hash::make($password);
 
-        if( $input['user_type'] === 'provider')
-        {
+        if ($input['user_type'] === 'provider') {
         }
         $user = User::create($input);
         $user->assignRole($input['user_type']);
         $input['api_token'] = $user->createToken('auth_token')->plainTextToken;
 
         unset($input['password']);
-        $message = trans('messages.save_form',['form' => $input['user_type'] ]);
+        $message = trans('messages.save_form', ['form' => $input['user_type']]);
         $user->api_token = $user->createToken('auth_token')->plainTextToken;
         $response = [
             'message' => $message,
@@ -728,16 +722,16 @@ class UserController extends Controller
     }
     public function editUser(UserRequest $request)
     {
-        if($request->has('id') && !empty($request->id)){
-            $user = User::where('id',$request->id)->first();
+        if ($request->has('id') && !empty($request->id)) {
+            $user = User::where('id', $request->id)->first();
         }
-        if($user == null){
-            return comman_message_response(__('messages.no_record_found'),400);
+        if ($user == null) {
+            return comman_message_response(__('messages.no_record_found'), 400);
         }
 
         $user->fill($request->all())->update();
 
-        if(isset($request->profile_image) && $request->profile_image != null ) {
+        if (isset($request->profile_image) && $request->profile_image != null) {
             $user->clearMediaCollection('profile_image');
             $user->addMediaFromRequest('profile_image')->toMediaCollection('profile_image');
         }
@@ -745,7 +739,7 @@ class UserController extends Controller
         $user_data = User::find($user->id);
 
         $message = __('messages.updated');
-        $user_data['profile_image'] = getSingleMedia($user_data,'profile_image',null);
+        $user_data['profile_image'] = getSingleMedia($user_data, 'profile_image', null);
         $user_data['user_role'] = $user->getRoleNames();
         unset($user_data['roles']);
         unset($user_data['media']);
@@ -753,19 +747,20 @@ class UserController extends Controller
             'data' => $user_data,
             'message' => $message
         ];
-        return comman_custom_response( $response );
+        return comman_custom_response($response);
     }
-    public function userWalletBalance(Request $request){
+    public function userWalletBalance(Request $request)
+    {
         $user = Auth::user();
         $amount = 0;
-        $wallet = Wallet::where('user_id',$user->id)->first();
-        if($wallet !== null){
+        $wallet = Wallet::where('user_id', $user->id)->first();
+        if ($wallet !== null) {
             $amount = $wallet->amount;
         }
         $response = [
             'balance' => $amount,
         ];
-        return comman_custom_response( $response );
+        return comman_custom_response($response);
     }
 
 
@@ -773,7 +768,7 @@ class UserController extends Controller
     public function verify(Request $request)
     {
         $email = $request->email;
-        $user = User::where('email',$email)->first();
+        $user = User::where('email', $email)->first();
         if ($user === null) {
             $message = 'User not registered. Please check your email or register.';
             $response = [
@@ -781,38 +776,38 @@ class UserController extends Controller
             ];
             return comman_custom_response($response);
         }
-        if($user->is_email_verified == 0){
-            $verificationLink = route('verify',['id' => $user->id]);
-            $response_data=Mail::to($user->email)->send(new VerificationEmail($verificationLink));
+        if ($user->is_email_verified == 0) {
+            $verificationLink = route('verify', ['id' => $user->id]);
+            $response_data = Mail::to($user->email)->send(new VerificationEmail($verificationLink));
             $message = 'Email Verification link has been sent to your email. Please Check your inbox';
             $response = [
-                    'message' => $message,
-                    'is_email_verified' => $user->is_email_verified,
+                'message' => $message,
+                'is_email_verified' => $user->is_email_verified,
             ];
             return comman_custom_response($response);
 
-        }else{
+        } else {
             $message = 'Email already verify!!!';
             $response = [
                 'message' => $message,
                 'is_email_verified' => $user->is_email_verified,
-        ];
+            ];
 
 
-        return comman_custom_response($response);
+            return comman_custom_response($response);
         }
     }
     public function SwitchLang(Request $request)
     {
-        $locale = $request->input('locale');  
+        $locale = $request->input('locale');
         App::setLocale($locale);
-        session()->put('locale', $locale); 
-        \Artisan::call('cache:clear'); 
+        session()->put('locale', $locale);
+        \Artisan::call('cache:clear');
         if (auth()->check()) {
             $user = auth()->user();
             $user->language_option = $locale;
             $user->save();
-        } 
+        }
         return response()->json([
             'status' => true,
             'message' => __('messages.Language_preference_updated'),
